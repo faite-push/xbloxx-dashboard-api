@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    reorderInfluencers(ids);
+    await reorderInfluencers(ids);
 
     return NextResponse.json({ message: 'Ordem atualizada com sucesso' }, { status: 200 });
   } catch (error) {

@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const influencers = getAllInfluencers();
+    const influencers = await getAllInfluencers();
     const nextOrder = influencers.length > 0 ? Math.max(...influencers.map((i) => i.display_order)) + 1 : 1;
 
-    const newInfluencer = createInfluencer({
+    const newInfluencer = await createInfluencer({
       name,
       followers_count,
       image_url: image_url || undefined,
@@ -61,7 +61,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedInfluencer = updateInfluencer(id, {
+    const updatedInfluencer = await updateInfluencer(id, {
       name,
       followers_count,
       image_url: image_url || undefined,
@@ -102,7 +102,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const success = deleteInfluencer(parseInt(id));
+    const success = await deleteInfluencer(parseInt(id));
 
     if (!success) {
       return NextResponse.json(
