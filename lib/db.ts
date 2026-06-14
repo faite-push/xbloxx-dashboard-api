@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 
 interface Admin {
   id: number;
@@ -27,7 +27,14 @@ interface Database {
 }
 
 const IS_PROD = process.env.NODE_ENV === 'production';
-const KV_KEY = 'xbloxx_db';
+const REDIS_URL = process.env.REDIS_URL;
+const REDIS_KEY = 'xbloxx_db_v2';
+
+// Standard Redis client for production
+let redis: Redis | null = null;
+if (IS_PROD && REDIS_URL) {
+  redis = new Redis(REDIS_URL);
+}
 
 // Singleton pattern to avoid issues with Hot Reload
 let dbCache: Database | null = null;
@@ -37,13 +44,16 @@ function getDbPath(): string {
 }
 
 async function initializeDatabase(): Promise<Database> {
-  // Check KV first in production
-  if (IS_PROD) {
-    const data = await kv.get<Database>(KV_KEY);
-    if (data) return data;
+  // Check Redis first in production
+  if (IS_PROD && redis) {
+    try {
+      const data = await redis.get(REDIS_KEY);
+      if (data) return JSON.parse(data);
+    } catch (err) {
+      console.error('Redis error:', err);
+    }
     
-    // If no data in KV, maybe it's first run or we should migrate from local?
-    // For now, return a default DB
+    // Default DB if nothing in Redis
     const hashedPassword = bcrypt.hashSync('senha123', 10);
     const defaultDb: Database = {
       admins: [
@@ -56,7 +66,7 @@ async function initializeDatabase(): Promise<Database> {
       ],
       influencers: [],
     };
-    await kv.set(KV_KEY, defaultDb);
+    await redis.set(REDIS_KEY, JSON.stringify(defaultDb));
     return defaultDb;
   }
 
@@ -97,8 +107,8 @@ async function getDb(): Promise<Database> {
 }
 
 async function saveDb(db: Database): Promise<void> {
-  if (IS_PROD) {
-    await kv.set(KV_KEY, db);
+  if (IS_PROD && redis) {
+    await redis.set(REDIS_KEY, JSON.stringify(db));
   } else {
     const dbPath = getDbPath();
     fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
