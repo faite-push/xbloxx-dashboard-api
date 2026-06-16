@@ -48,21 +48,43 @@ export default function InfluencerModal({ isOpen, onClose, onSave, influencer }:
     setError('');
   }, [influencer, isOpen]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setImagePreview(base64String);
-        setFormData({ ...formData, image_url: base64String });
-      };
-      reader.readAsDataURL(file);
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Imagem muito grande (máximo 10MB)');
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      
+      try {
+        const response = await fetch(`/api/admin/upload?filename=${file.name}`, {
+          method: 'POST',
+          body: file,
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha no upload da imagem');
+        }
+
+        const blob = await response.json();
+        setImagePreview(blob.url);
+        setFormData({ ...formData, image_url: blob.url });
+      } catch (err) {
+        setError('Erro ao enviar imagem. Tente novamente.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setError('');
     setLoading(true);
 
