@@ -38,9 +38,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: data.error || 'Erro no upload para o CDN externo' }, { status: response.status });
     }
 
-    // Adjust URL if it's returning a local IP or wrong domain (unlikely but safe)
+    // Ensure the URL uses https
+    const secureUrl = data.url.replace('http://', 'https://');
+
     return NextResponse.json({
-      url: data.url,
+      url: secureUrl,
       filename: data.filename
     });
   } catch (error) {
