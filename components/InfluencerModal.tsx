@@ -60,9 +60,12 @@ export default function InfluencerModal({ isOpen, onClose, onSave, influencer }:
       setError('');
       
       try {
-        const response = await fetch(`/api/admin/upload?filename=${file.name}`, {
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+
+        const response = await fetch(`/api/admin/upload`, {
           method: 'POST',
-          body: file,
+          body: uploadData,
         });
 
         if (!response.ok) {

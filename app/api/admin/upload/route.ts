@@ -1,12 +1,8 @@
-import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
-  const filename = searchParams.get('filename');
-
-  // Verify authentication
+  // Verify local authentication
   const cookieHeader = request.headers.get('cookie');
   const token = cookieHeader?.split('; ').find(row => row.startsWith('auth-token='))?.split('=')[1];
   
@@ -14,18 +10,41 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  if (!filename || !request.body) {
-    return NextResponse.json({ error: 'Arquivo inválido' }, { status: 400 });
-  }
-
   try {
-    const blob = await put(filename, request.body, {
-      access: 'public',
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+
+    if (!file) {
+      return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
+    }
+
+    const apiUrl = process.env.EXTERNAL_API_URL || 'https://dragonbux-api.squareweb.app';
+    
+    // Prepare external FormData
+    const externalFormData = new FormData();
+    externalFormData.append('file', file);
+
+    const response = await fetch(`${apiUrl}/v1/cdn/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: externalFormData
     });
 
-    return NextResponse.json(blob);
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: data.error || 'Erro no upload para o CDN externo' }, { status: response.status });
+    }
+
+    // Adjust URL if it's returning a local IP or wrong domain (unlikely but safe)
+    return NextResponse.json({
+      url: data.url,
+      filename: data.filename
+    });
   } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Erro no upload' }, { status: 500 });
+    console.error('Upload proxy error:', error);
+    return NextResponse.json({ error: 'Erro interno ao processar upload' }, { status: 500 });
   }
 }
